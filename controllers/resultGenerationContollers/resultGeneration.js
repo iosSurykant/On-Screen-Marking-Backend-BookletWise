@@ -1676,6 +1676,12 @@ const downloadCompletedBooklets = async (req, res) => {
 
                 const pageHeight = page.getHeight();
 
+                const emailIndex = users.findIndex(
+                  (u) => u.email === a.evaluatorEmail,
+                );
+
+                const offsetY = emailIndex * 60;
+
                 //---------- Icon Size ----------
                 if (icon !== "noicon") {
                   page.drawImage(icon, {
@@ -1725,13 +1731,19 @@ const downloadCompletedBooklets = async (req, res) => {
                   });
                 }
 
-                summaryData.push({
-                  question: `Q${a.question}`,
-                  marks: a.mark,
-                  page: pageNumber,
-                  time: a.timeStamps || "",
-                });
-
+                if (
+                  a.mark !== undefined &&
+                  a.mark !== null &&
+                  Number(a.mark) > 0
+                ) {
+                  summaryData.push({
+                    question: `Q${a.question}`,
+                    marks: Number(a.mark),
+                    page: pageNumber,
+                    time: a.timeStamps || "",
+                    email: a.evaluatorEmail,
+                  });
+                }
                 totalMarks += Number(a.mark);
               }
             }
@@ -1749,7 +1761,29 @@ const downloadCompletedBooklets = async (req, res) => {
               font: fontBold,
             });
 
+            const usersList = [...new Set(summaryData.map((r) => r.email))];
+
+            const questionMap = {};
+            const totalPerUser = {};
+
+            for (const row of summaryData) {
+              if (!questionMap[row.question]) {
+                questionMap[row.question] = {};
+              }
+
+              if (!questionMap[row.question][row.email]) {
+                questionMap[row.question][row.email] = 0;
+              }
+
+              questionMap[row.question][row.email] += Number(row.marks);
+
+              totalPerUser[row.email] =
+                (totalPerUser[row.email] || 0) + Number(row.marks);
+            }
+
             let y = height - 80;
+
+            /* HEADER */
 
             summaryPage.drawText("Question", {
               x: 50,
@@ -1757,52 +1791,74 @@ const downloadCompletedBooklets = async (req, res) => {
               size: 13,
               font: fontBold,
             });
-            summaryPage.drawText("Marks", {
-              x: 150,
-              y,
-              size: 13,
-              font: fontBold,
-            });
-            summaryPage.drawText("Page", {
-              x: 250,
-              y,
-              size: 13,
-              font: fontBold,
-            });
-            summaryPage.drawText("Time", {
-              x: 350,
-              y,
-              size: 13,
-              font: fontBold,
-            });
 
-            y -= 20;
+            let headerX = 180;
 
-            for (const row of summaryData) {
-              summaryPage.drawText(row.question, { x: 50, y, size: 11, font });
-              summaryPage.drawText(String(row.marks), {
-                x: 150,
+            for (const email of usersList) {
+              summaryPage.drawText(email, {
+                x: headerX,
+                y,
+                size: 10,
+                font: fontBold,
+              });
+
+              headerX += 180;
+            }
+
+            y -= 25;
+
+            /* QUESTIONS */
+
+            for (const question in questionMap) {
+              summaryPage.drawText(question, {
+                x: 50,
                 y,
                 size: 11,
                 font,
               });
-              summaryPage.drawText(String(row.page), {
-                x: 250,
-                y,
-                size: 11,
-                font,
-              });
-              summaryPage.drawText(row.time, { x: 350, y, size: 11, font });
+
+              let marksX = 180;
+
+              for (const email of usersList) {
+                summaryPage.drawText(
+                  String(questionMap[question][email] ?? "-"),
+                  {
+                    x: marksX,
+                    y,
+                    size: 11,
+                    font,
+                  },
+                );
+
+                marksX += 180;
+              }
 
               y -= 20;
             }
 
-            summaryPage.drawText(`Total Marks: ${totalMarks}`, {
-              x: width - 200,
-              y: y - 10,
-              size: 14,
+            /* TOTALS */
+
+            y -= 20;
+
+            summaryPage.drawText("TOTAL", {
+              x: 50,
+              y,
+              size: 13,
               font: fontBold,
             });
+
+            let totalX = 180;
+
+            for (const email of usersList) {
+              summaryPage.drawText(String(totalPerUser[email] || 0), {
+                x: totalX,
+                y,
+                size: 13,
+                font: fontBold,
+              });
+
+              totalX += 180;
+            }
 
             const finalBytes = await pdfDoc.save();
 
