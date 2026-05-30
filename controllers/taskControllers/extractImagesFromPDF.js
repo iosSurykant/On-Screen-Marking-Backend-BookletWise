@@ -23,7 +23,7 @@ const extractImagesFromPdf = (pdfPath, outputDir) => {
     const outputPrefix = path.join(outputDir, "page");
 
     // 🔑 Spawn Poppler process
-    const poppler = spawn("pdftoppm", [
+    const poppler = spawn("/usr/bin/pdftoppm", [
       "-png",
       "-r",
       "70",        // DPI (high quality)
@@ -324,4 +324,4 @@ export default extractImagesFromPdf;
 //   });
 // };
 
-// export default extractImagesFromPdf;
+// // export default extractImagesFromPdf;
